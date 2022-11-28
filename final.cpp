@@ -334,6 +334,11 @@ Display()
 	GLint yb = (vy - v) / 2;
 	glViewport(xl, yb, v, v);
 
+	if (AxesOn != 0)
+	{
+		glColor3fv(&Colors[WhichColor][0]);
+		glCallList(AxesList);
+	}
 
 	// set the viewing volume:
 	// remember that the Z clipping  values are actually
@@ -383,7 +388,7 @@ Display()
 	glColor3f(1., 1., 1.);
 	OsuSphere(0.5, 64., 64.);
 	//OsuSphere(0.1, 64., 64.);
-	SetPointLight(GL_LIGHT0, 1., 1., 1., 1., 1., 1.);
+	SetPointLight(GL_LIGHT0, 0., 0., 0., 1., 1., 1.);
 	glPopMatrix();
 
 
@@ -420,7 +425,7 @@ Display()
 	glEnable(GL_TEXTURE_2D);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glBindTexture(GL_TEXTURE_2D, moontex);
-	glTranslatef(0., 0., 2.0);
+	glTranslatef(0., 0., 3.0);
 	glRotatef(60, 0.8, -0.8, 0.);
 	OsuSphere(0.5, 64., 64.);
 	glPopMatrix();
@@ -433,7 +438,7 @@ Display()
 	glEnable(GL_TEXTURE_2D);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glBindTexture(GL_TEXTURE_2D, earthtex);
-	glTranslatef(0., 0., -2.);
+	glTranslatef(0., 0., -3.);
 	glRotatef(90, 1, 0., 0.);
 	OsuSphere(0.5, 64., 64.);
 	glPopMatrix();
@@ -442,11 +447,14 @@ Display()
 
 	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
-	glDisable(GL_TEXTURE_2D);
-	SetMaterial(0., 1., 1., 128.);
-	glTranslatef(sin(2. * M_PI * NUM_BACK_AND_FORTH_PER_CYCLE * Time), 1.25, 0.);
-	glRotatef(90, 1, 0., 0.);
-	OsuTorus(0.2, 0.8, 100, 100);
+	SetMaterial(1., 1., 1., 50.);
+	glEnable(GL_TEXTURE_2D);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glBindTexture(GL_TEXTURE_2D, earthtex);
+	glRotatef((sin(Time) * 428), 0, 1., 0.);
+	glTranslatef(1.25, 0, 0.);
+	glRotatef((sin(Time) * 428), 0, 1., 0.);
+	OsuSphere(0.5, 64., 64.);
 	glPopMatrix();
 	glDisable(GL_LIGHTING);
 
