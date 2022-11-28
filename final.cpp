@@ -176,6 +176,7 @@ int		ActiveButton;			// current button that is down
 GLuint  worldtex;               // list to hold world map texture
 GLuint  moontex;
 GLuint  earthtex;
+GLuint  suntex;
 GLuint	AxesList;				// list to hold the axes
 int		AxesOn;					// != 0 means to draw the axes
 int		DebugOn;				// != 0 means to print debugging info
@@ -370,13 +371,18 @@ Display()
 	// since we are using glScalef( ), be sure the normals get unitized:
 
 	glEnable(GL_NORMALIZE);
-
+	//glEnable(GL_LIGHTING);	// enable lighting
 	// create first light (stationary, point light, white light, small sphere)
-
+	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
+	SetMaterial(1., 1., 1., 50.);
+	glEnable(GL_TEXTURE_2D);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glBindTexture(GL_TEXTURE_2D, suntex);
 	//glTranslatef(1., 1., 1.);
 	glColor3f(1., 1., 1.);
-	OsuSphere(0.05, 64., 64.);
+	OsuSphere(0.5, 64., 64.);
+	//OsuSphere(0.1, 64., 64.);
 	SetPointLight(GL_LIGHT0, 1., 1., 1., 1., 1., 1.);
 	glPopMatrix();
 
@@ -414,7 +420,7 @@ Display()
 	glEnable(GL_TEXTURE_2D);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glBindTexture(GL_TEXTURE_2D, moontex);
-	glTranslatef(0., 0., 0.7);
+	glTranslatef(0., 0., 2.0);
 	glRotatef(60, 0.8, -0.8, 0.);
 	OsuSphere(0.5, 64., 64.);
 	glPopMatrix();
@@ -424,8 +430,10 @@ Display()
 	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
 	SetMaterial(1., 1., 1., 50.);
+	glEnable(GL_TEXTURE_2D);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glBindTexture(GL_TEXTURE_2D, earthtex);
-	glTranslatef(0., 0., -1.8);
+	glTranslatef(0., 0., -2.);
 	glRotatef(90, 1, 0., 0.);
 	OsuSphere(0.5, 64., 64.);
 	glPopMatrix();
@@ -764,6 +772,22 @@ InitGraphics()
 	t32 = BmpToTexture("earth.bmp", &width, &height);
 
 	glBindTexture(GL_TEXTURE_2D, earthtex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+	glTexImage2D(GL_TEXTURE_2D, 0, 3, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, t32);
+
+	glGenTextures(1, &suntex);
+
+	// texture image settings
+
+	width = 2, height = 2;
+	t32 = BmpToTexture("sun.bmp", &width, &height);
+
+	glBindTexture(GL_TEXTURE_2D, suntex);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
