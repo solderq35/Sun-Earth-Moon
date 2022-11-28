@@ -41,7 +41,7 @@ const int NUM_BACK_AND_FORTH_PER_CYCLE = 1;
 
 // title of these windows:
 
-const char* WINDOWTITLE = "Project 4: Lighting -- Jeff Huang";
+const char* WINDOWTITLE = "Final Project -- Jeff Huang";
 const char* GLUITITLE = "User Interface Window";
 
 // what the glui package defines as true and false:
@@ -420,19 +420,20 @@ Display()
 
 	// draw second object(stationary, dull, flat, green torus, lighted)
 
-	glShadeModel(GL_FLAT);
+	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
-	SetMaterial(0., 1., 0., 2.);
-	glDisable(GL_TEXTURE_2D);
+	SetMaterial(1., 1., 1., 50.);
+	
 	glTranslatef(0., 0., -1.8);
 	glRotatef(90, 1, 0., 0.);
-	OsuTorus(0.5, 0.5, 100, 100);
+	OsuSphere(0.5, 64., 64.);
 	glPopMatrix();
 
 	// draw third object (moving, shiny, smooth, cyan torus, lighted)
 
 	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
+	glDisable(GL_TEXTURE_2D);
 	SetMaterial(0., 1., 1., 128.);
 	glTranslatef(sin(2. * M_PI * NUM_BACK_AND_FORTH_PER_CYCLE * Time), 1.25, 0.);
 	glRotatef(90, 1, 0., 0.);
