@@ -175,6 +175,7 @@ const GLfloat FOGEND = 4.f;
 int		ActiveButton;			// current button that is down
 GLuint  worldtex;               // list to hold world map texture
 GLuint  moontex;
+GLuint  earthtex;
 GLuint	AxesList;				// list to hold the axes
 int		AxesOn;					// != 0 means to draw the axes
 int		DebugOn;				// != 0 means to print debugging info
@@ -373,7 +374,7 @@ Display()
 	// create first light (stationary, point light, white light, small sphere)
 
 	glPushMatrix();
-	glTranslatef(1., 1., 1.);
+	//glTranslatef(1., 1., 1.);
 	glColor3f(1., 1., 1.);
 	OsuSphere(0.05, 64., 64.);
 	SetPointLight(GL_LIGHT0, 1., 1., 1., 1., 1., 1.);
@@ -423,7 +424,7 @@ Display()
 	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
 	SetMaterial(1., 1., 1., 50.);
-	
+	glBindTexture(GL_TEXTURE_2D, earthtex);
 	glTranslatef(0., 0., -1.8);
 	glRotatef(90, 1, 0., 0.);
 	OsuSphere(0.5, 64., 64.);
@@ -755,6 +756,22 @@ InitGraphics()
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, t32);
 
+	glGenTextures(1, &earthtex);
+
+	// texture image settings
+
+	width = 2, height = 2;
+	t32 = BmpToTexture("earth.bmp", &width, &height);
+
+	glBindTexture(GL_TEXTURE_2D, earthtex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+	glTexImage2D(GL_TEXTURE_2D, 0, 3, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, t32);
+
 	// init glew (a window must be open to do this):
 
 #ifdef WIN32
@@ -859,6 +876,7 @@ Keyboard(unsigned char c, int x, int y)
 	switch (c)
 	{
 	case '0':	// entering '0' will turn on/off the first/white light 
+	case '6':
 		Light0On = !Light0On;
 		break;
 	case '1':	// entering '1' will turn on/off the second/red light 
