@@ -36,6 +36,12 @@
 //
 //	Author:			Jeff Huang
 
+const float SUN_RADIUS = 15.0;
+const float EARTH_RADIUS = 2;
+const float EARTH_ORBIT = 45;
+const float MOON_RADIUS = 0.5;
+const float MOON_ORBIT = 3;
+
 // number of times object moves per cycle
 const int NUM_BACK_AND_FORTH_PER_CYCLE = 1;
 
@@ -358,7 +364,7 @@ Display()
 
 	// set the eye position, look-at position, and up-vector:
 
-	gluLookAt(3.3f, 0.f, 0.06f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
+	gluLookAt(3.3f, 0.f, 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
 
 
 	// rotate the scene:
@@ -386,7 +392,7 @@ Display()
 	glBindTexture(GL_TEXTURE_2D, suntex);
 	//glTranslatef(1., 1., 1.);
 	glColor3f(1., 1., 1.);
-	OsuSphere(0.5, 64., 64.);
+	OsuSphere(SUN_RADIUS, 64., 64.);
 	//OsuSphere(0.1, 64., 64.);
 	SetPointLight(GL_LIGHT0, 0., 0., 0., 1., 1., 1.);
 	glPopMatrix();
@@ -425,22 +431,11 @@ Display()
 	glEnable(GL_TEXTURE_2D);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glBindTexture(GL_TEXTURE_2D, moontex);
-	glTranslatef(0., 0., 3.0);
-	glRotatef(60, 0.8, -0.8, 0.);
-	OsuSphere(0.5, 64., 64.);
-	glPopMatrix();
-
-	// draw second object(stationary, dull, flat, green torus, lighted)
-
-	glShadeModel(GL_SMOOTH);
-	glPushMatrix();
-	SetMaterial(1., 1., 1., 50.);
-	glEnable(GL_TEXTURE_2D);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	glBindTexture(GL_TEXTURE_2D, earthtex);
-	glTranslatef(0., 0., -3.);
-	glRotatef(90, 1, 0., 0.);
-	OsuSphere(0.5, 64., 64.);
+	glRotatef((sin(Time) * 428), 0, 1., 0.);
+	glTranslatef(EARTH_ORBIT, 0, 0.);
+	glRotatef((sin(Time) * 428), 0, 1., 0.);
+	glTranslatef(MOON_ORBIT, 0, 0.);
+	OsuSphere(MOON_RADIUS, 64., 64.);
 	glPopMatrix();
 
 	// draw third object (moving, shiny, smooth, cyan torus, lighted)
@@ -452,9 +447,9 @@ Display()
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glBindTexture(GL_TEXTURE_2D, earthtex);
 	glRotatef((sin(Time) * 428), 0, 1., 0.);
-	glTranslatef(1.25, 0, 0.);
+	glTranslatef(EARTH_ORBIT, 0, 0.);
 	glRotatef((sin(Time) * 428), 0, 1., 0.);
-	OsuSphere(0.5, 64., 64.);
+	OsuSphere(EARTH_RADIUS, 64., 64.);
 	glPopMatrix();
 	glDisable(GL_LIGHTING);
 
@@ -1142,7 +1137,8 @@ void
 SetPointLight(int ilight, float x, float y, float z, float r, float g, float b)
 {
 	glLightfv(ilight, GL_POSITION, Array3(x, y, z));
-	glLightfv(ilight, GL_AMBIENT, Array3(0., 0., 0.));
+	//glLightfv(ilight, GL_AMBIENT, Array3(0.1, 0.1, 0.1));
+	glLightfv(ilight, GL_AMBIENT, Array3(1, 1, 1));
 	glLightfv(ilight, GL_DIFFUSE, Array3(r, g, b));
 	glLightfv(ilight, GL_SPECULAR, Array3(r, g, b));
 	glLightf(ilight, GL_CONSTANT_ATTENUATION, 1.);
