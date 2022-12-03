@@ -1,7 +1,15 @@
 #include <stdio.h>
+#include <string>
 #include <stdlib.h>
 #include <ctype.h>
-
+#define GLM_FORCE_RADIANS
+#include "glm/vec2.hpp"
+#include "glm/vec3.hpp"
+#include "glm/mat4x4.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/matrix_inverse.hpp"
+#include "glm/glm.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -32,15 +40,23 @@
 //		4. Depth cueing to be turned on and off
 //		5. The projection to be changed
 //		6. The transformations to be reset
-//		7. The program to quit
+//		7. The program to quitMoon_
 //
 //	Author:			Jeff Huang
 
 const float SUN_RADIUS = 15.0;
 const float EARTH_RADIUS = 2;
 const float EARTH_ORBIT = 45;
-const float MOON_RADIUS = 0.5;
+const float MOON_RADIUS = 2 * (1079.6 / 3964.19);
 const float MOON_ORBIT = 3;
+const float ONE_FULL_TURN = 360. / sin(1.);
+const float MONTHS_PER_YEAR = 365. / 28.;
+const float DAYS_PER_YEAR = 365;
+int		WhichPOV;				// outside or inside view
+const float EARTH_ORBIT_TIME_SECONDS = 200;
+const float EARTH_SPIN_TIME_SECONDS = 200 / 365.;
+const float EARTH_RADIUS_MILES = 2;
+const float EARTH_ORBITAL_RADIUS_MILES = 45;
 
 // number of times object moves per cycle
 const int NUM_BACK_AND_FORTH_PER_CYCLE = 1;
@@ -91,6 +107,14 @@ const float SCROLL_WHEEL_CLICK_FACTOR = 5.f;
 const int LEFT = 4;
 const int MIDDLE = 2;
 const int RIGHT = 1;
+
+enum ViewVals
+{
+	OUTSIDE,
+	INSIDE,
+	EARTHVIEW,
+	MOONVIEW
+};
 
 // which projection:
 
@@ -198,7 +222,7 @@ int		WhichProjection;		// ORTHO or PERSP
 int		Xmouse, Ymouse;			// mouse values
 float	Xrot, Yrot;				// rotation angles in degrees
 float	Time;					// timer in the range [0.,1.)
-bool	Light0On, Light1On, Light2On, Frozen; // checking if the lights should be turned on or if all objects should stop moving
+bool	Light0On, Frozen; // checking if the lights should be turned on or if all objects should stop moving
 
 
 // function prototypes:
@@ -297,7 +321,7 @@ Animate()
 	// put animation stuff in here -- change some global variables
 	// for Display( ) to find:
 
-	const int MS_IN_THE_ANIMATION_CYCLE = 10000;
+	const int MS_IN_THE_ANIMATION_CYCLE = 200000;
 	int ms = glutGet(GLUT_ELAPSED_TIME);
 	ms %= MS_IN_THE_ANIMATION_CYCLE;
 	Time = ((float)ms / (float)MS_IN_THE_ANIMATION_CYCLE);
@@ -308,12 +332,49 @@ Animate()
 	glutPostRedisplay();
 }
 
+void
+LatLngToXYZ(float lat, float lng, float rad, glm::vec3* xyzp)
+{
+	lat = glm::radians(lat);
+	lng = glm::radians(lng);
+	xyzp->y = rad * sin(lat);
+	float xz = cos(lat);
+	xyzp->x = rad * xz * cos(lng);
+	xyzp->z = rad * xz * sin(lng);
+}
+
+void
+SetViewingFromLatLng(float eyeLat, float eyeLng, float lookLat, float lookLng, float rad, glm::vec4* eyep, glm::vec4* lookp) {
+	glm::vec3 eye, look;
+	LatLngToXYZ(eyeLat, eyeLng, rad, &eye);
+	LatLngToXYZ(lookLat, lookLng, rad, &look);
+	glm::vec3 up = glm::normalize(eye); // only true for spheres !!
+	glm::vec3 eyeToLook = look - eye;
+	glm::vec3 parallelToUp = glm::dot(up, eyeToLook) * eyeToLook;
+	eyeToLook = eyeToLook - parallelToUp;
+	*eyep = glm::vec4(eye, 1.);
+	*lookp = glm::vec4(eye + eyeToLook, 1.);
+}
+
+glm::mat4
+MakeEarthMatrix()
+{
+	float earthSpinAngle = Time * ONE_FULL_TURN * 24 * 60 * 60;
+	float earthOrbitAngle = Time * ONE_FULL_TURN;
+	glm::mat4 identity = glm::mat4(1.);
+	glm::vec3 yaxis = glm::vec3(0., 1., 0.);
+	/* 3. */ glm::mat4 erorbity = glm::rotate(identity, earthOrbitAngle, yaxis);
+	/* 2. */ glm::mat4 etransx = glm::translate(identity, glm::vec3(EARTH_ORBITAL_RADIUS_MILES, 0., 0.));/* 1. */ glm::mat4 erspiny = glm::rotate(identity, earthSpinAngle, yaxis);
+	return erorbity * etransx * erspiny; // 3 * 2 * 1
+}
+
 
 // draw the complete scene:
 
 void
 Display()
 {
+
 	// set which window we want to do the graphics into:
 
 	glutSetWindow(MainWindow);
@@ -361,29 +422,63 @@ Display()
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
+	glm::mat4 e, m;
+	glm::vec4 eye = glm::vec4(0., 0., 0., 1.);
+	glm::vec4 look = glm::vec4(0., 0., 0., 1.);
+	glm::vec4 up = glm::vec4(0., 0., 0., 0.); // vectors don’t get translations
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	
+	if (WhichPOV == OUTSIDE)
+	{
 
-	// set the eye position, look-at position, and up-vector:
+		// set the eye position, look-at position, and up-vector:
 
-	gluLookAt(3.3f, 0.f, 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
+		gluLookAt(3.3f, 0.f, 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
+		//gluLookAt((3.3f), (sin(Time) * (ONE_FULL_TURN)), 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
 
+		// rotate the scene:
 
-	// rotate the scene:
+		glRotatef((GLfloat)Yrot, 0.f, 1.f, 0.f);
+		glRotatef((GLfloat)Xrot, 1.f, 0.f, 0.f);
 
-	glRotatef((GLfloat)Yrot, 0.f, 1.f, 0.f);
-	glRotatef((GLfloat)Xrot, 1.f, 0.f, 0.f);
+		// uniformly scale the scene:
 
+		if (Scale < MINSCALE)
+			Scale = MINSCALE;
+		glScalef((GLfloat)Scale, (GLfloat)Scale, (GLfloat)Scale);
 
-	// uniformly scale the scene:
+	}
 
-	if (Scale < MINSCALE)
-		Scale = MINSCALE;
-	glScalef((GLfloat)Scale, (GLfloat)Scale, (GLfloat)Scale);
+	else if (WhichPOV == INSIDE) {
+		gluLookAt(0., 1.2, 1., 0., 5., 10., 0., 1., 0.);
+	}
+
+	else if (WhichPOV == EARTHVIEW) {
+		m = MakeEarthMatrix();
+
+		eye.x = EARTH_RADIUS;
+		eye = m * eye;
+
+		look.x = EARTH_RADIUS;
+		look.z = -1000.;
+		look = m * look;
+
+		up.x = 1000.;
+		//up.y = 1000.;
+		//up.z = 1000.;
+		up = m * up;
+
+		gluLookAt(eye.x, eye.y, eye.z, look.x, look.y, look.z,
+			up.x, up.y, up.z);
+	}
 
 	// since we are using glScalef( ), be sure the normals get unitized:
 
 	glEnable(GL_NORMALIZE);
 	//glEnable(GL_LIGHTING);	// enable lighting
-	// create first light (stationary, point light, white light, small sphere)
+
+	// create sun light
 	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
 	SetMaterial(1., 1., 1., 50.);
@@ -398,32 +493,34 @@ Display()
 	glPopMatrix();
 
 
-	// checking if the first light is on
+	// checking if the sun light is on
 
 	if (Light0On)
 		glEnable(GL_LIGHT0);
 	else
 		glDisable(GL_LIGHT0);
 
-	// checking if the second light is on
-
-	if (Light1On)
-		glEnable(GL_LIGHT1);
-	else
-		glDisable(GL_LIGHT1);
-
-	// checking if the third light is on
-
-	if (Light2On)
-		glEnable(GL_LIGHT2);
-	else
-		glDisable(GL_LIGHT2);
-
 	glEnable(GL_LIGHTING);	// enable lighting
 
 	// creating the objects/spheres
 
-	// draw first object (stationary, dull, smooth, textured, white torus, lighted)
+	glm::mat4 earth = MakeEarthMatrix();
+
+	// draw earth
+	glShadeModel(GL_SMOOTH);
+	glPushMatrix();
+	SetMaterial(1., 1., 1., 50.);
+	glEnable(GL_TEXTURE_2D);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glBindTexture(GL_TEXTURE_2D, earthtex);
+	//glRotatef((sin(Time) * (ONE_FULL_TURN)), 0, 1., 0.);
+	//glTranslatef(EARTH_ORBIT, 0, 0.);
+	//glRotatef((sin(Time) * (ONE_FULL_TURN * DAYS_PER_YEAR)), 0, 1., 0.);
+	glMultMatrixf(glm::value_ptr(earth));
+	OsuSphere(EARTH_RADIUS, 64., 64.);
+	glPopMatrix();
+
+	// draw moon
 
 	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
@@ -431,26 +528,14 @@ Display()
 	glEnable(GL_TEXTURE_2D);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glBindTexture(GL_TEXTURE_2D, moontex);
-	glRotatef((sin(Time) * 428), 0, 1., 0.);
+	// 13, 365 / 28 ; month
+	glRotatef((sin(Time) * (ONE_FULL_TURN)), 0, 1., 0.);
 	glTranslatef(EARTH_ORBIT, 0, 0.);
-	glRotatef((sin(Time) * 428), 0, 1., 0.);
+	glRotatef((sin(Time) * ((ONE_FULL_TURN) * MONTHS_PER_YEAR)), 0, 1., 0.);
 	glTranslatef(MOON_ORBIT, 0, 0.);
 	OsuSphere(MOON_RADIUS, 64., 64.);
 	glPopMatrix();
 
-	// draw third object (moving, shiny, smooth, cyan torus, lighted)
-
-	glShadeModel(GL_SMOOTH);
-	glPushMatrix();
-	SetMaterial(1., 1., 1., 50.);
-	glEnable(GL_TEXTURE_2D);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	glBindTexture(GL_TEXTURE_2D, earthtex);
-	glRotatef((sin(Time) * 428), 0, 1., 0.);
-	glTranslatef(EARTH_ORBIT, 0, 0.);
-	glRotatef((sin(Time) * 428), 0, 1., 0.);
-	OsuSphere(EARTH_RADIUS, 64., 64.);
-	glPopMatrix();
 	glDisable(GL_LIGHTING);
 
 	// swap the double-buffered framebuffers:
@@ -523,6 +608,15 @@ DoDepthMenu(int id)
 	glutPostRedisplay();
 }
 
+
+void
+DoViewMenu(int id)
+{
+	WhichPOV = id;
+
+	glutSetWindow(MainWindow);
+	glutPostRedisplay();
+}
 
 // main menu callback:
 
@@ -619,6 +713,13 @@ InitMenus()
 {
 	glutSetWindow(MainWindow);
 
+	// viewing options
+	int viewmenu = glutCreateMenu(DoViewMenu);
+	glutAddMenuEntry("Outside", OUTSIDE);
+	glutAddMenuEntry("Inside", INSIDE);
+	glutAddMenuEntry("Earthview", EARTHVIEW);
+	glutAddMenuEntry("Moonview", MOONVIEW);
+
 	int numColors = sizeof(Colors) / (3 * sizeof(int));
 	int colormenu = glutCreateMenu(DoColorMenu);
 	for (int i = 0; i < numColors; i++)
@@ -651,6 +752,7 @@ InitMenus()
 	glutAddMenuEntry("Perspective", PERSP);
 
 	int mainmenu = glutCreateMenu(DoMainMenu);
+	glutAddSubMenu("Views", viewmenu);
 	glutAddSubMenu("Axes", axesmenu);
 	glutAddSubMenu("Axis Colors", colormenu);
 
@@ -902,15 +1004,27 @@ Keyboard(unsigned char c, int x, int y)
 
 	switch (c)
 	{
+	case 'i':
+	case 'I':
+		WhichPOV = INSIDE;
+		break;
+
+	case 'o':
+	case 'O':
+		WhichPOV = OUTSIDE;
+		break;
+	case 'e':
+	case 'E':
+		WhichPOV = EARTHVIEW;
+		break;
+
+	case 'm':
+	case 'M':
+		WhichPOV = MOONVIEW;
+		break;
 	case '0':	// entering '0' will turn on/off the first/white light 
 	case '6':
 		Light0On = !Light0On;
-		break;
-	case '1':	// entering '1' will turn on/off the second/red light 
-		Light1On = !Light1On;
-		break;
-	case '2':	// entering '2' will turn on/off the third/blue light 
-		Light2On = !Light2On;
 		break;
 	case 'f':	// entering 'f' or 'F' will turn on/off all animation
 	case 'F':
@@ -1137,8 +1251,8 @@ void
 SetPointLight(int ilight, float x, float y, float z, float r, float g, float b)
 {
 	glLightfv(ilight, GL_POSITION, Array3(x, y, z));
-	//glLightfv(ilight, GL_AMBIENT, Array3(0.1, 0.1, 0.1));
-	glLightfv(ilight, GL_AMBIENT, Array3(1, 1, 1));
+	glLightfv(ilight, GL_AMBIENT, Array3(0.1, 0.1, 0.1));
+	//glLightfv(ilight, GL_AMBIENT, Array3(1, 1, 1));
 	glLightfv(ilight, GL_DIFFUSE, Array3(r, g, b));
 	glLightfv(ilight, GL_SPECULAR, Array3(r, g, b));
 	glLightf(ilight, GL_CONSTANT_ATTENUATION, 1.);
@@ -1607,3 +1721,4 @@ Unit(float vin[3], float vout[3])
 	}
 	return dist;
 }
+
