@@ -49,7 +49,8 @@ const float EARTH_RADIUS = 2;
 const float EARTH_ORBIT = 45;
 const float MOON_RADIUS = 2 * (1079.6 / 3964.19);
 const float MOON_ORBIT = 3;
-const float ONE_FULL_TURN = 360. / sin(1.);
+//const float ONE_FULL_TURN = 360. / sin(1.);
+const float ONE_FULL_TURN = 2 * M_PI;
 const float MONTHS_PER_YEAR = 365. / 28.;
 const float DAYS_PER_YEAR = 365;
 int		WhichPOV;				// outside or inside view
@@ -57,6 +58,8 @@ const float EARTH_ORBIT_TIME_SECONDS = 200;
 const float EARTH_SPIN_TIME_SECONDS = 200 / 365.;
 const float EARTH_RADIUS_MILES = 2;
 const float EARTH_ORBITAL_RADIUS_MILES = 45;
+const float MOON_ORBITAL_RADIUS_MILES = 4;
+const float MOON_RADIUS_MILES = 2 * 1079.6 / 3964.19;
 
 // number of times object moves per cycle
 const int NUM_BACK_AND_FORTH_PER_CYCLE = 1;
@@ -359,15 +362,33 @@ SetViewingFromLatLng(float eyeLat, float eyeLng, float lookLat, float lookLng, f
 glm::mat4
 MakeEarthMatrix()
 {
-	float earthSpinAngle = Time * ONE_FULL_TURN * 24 * 60 * 60;
-	float earthOrbitAngle = Time * ONE_FULL_TURN;
+	float earthSpinAngle = Time * ONE_FULL_TURN * 30 * 10;
+	float earthOrbitAngle = Time * ONE_FULL_TURN * 10;
 	glm::mat4 identity = glm::mat4(1.);
 	glm::vec3 yaxis = glm::vec3(0., 1., 0.);
 	/* 3. */ glm::mat4 erorbity = glm::rotate(identity, earthOrbitAngle, yaxis);
 	/* 2. */ glm::mat4 etransx = glm::translate(identity, glm::vec3(EARTH_ORBITAL_RADIUS_MILES, 0., 0.));/* 1. */ glm::mat4 erspiny = glm::rotate(identity, earthSpinAngle, yaxis);
 	return erorbity * etransx * erspiny; // 3 * 2 * 1
+	//printf("EARTH_ORBIT_KM: %.*f\n", 12, EARTH_ORBITAL_RADIUS_MILES);
 }
 
+glm::mat4 MakeMoonMatrix()
+{
+	float moonSpinAngle = Time * ONE_FULL_TURN * 10 * 12.;
+	float moonOrbitAngle = Time * ONE_FULL_TURN * 10 * 12.;
+	float earthOrbitAngle = Time * ONE_FULL_TURN * 10;
+	glm::mat4 identity = glm::mat4(1.);
+	glm::vec3 yaxis = glm::vec3(0., 1., 0.);
+
+	/* 5. */ glm::mat4 erorbity = glm::rotate(identity, earthOrbitAngle, yaxis);
+	/* 4. */ glm::mat4 etransx = glm::translate(identity, glm::vec3(EARTH_ORBITAL_RADIUS_MILES, 0., 0.));
+	/* 3. */ glm::mat4 mrorbity = glm::rotate(identity, moonOrbitAngle, yaxis);
+	/* 2. */ glm::mat4 mtransx = glm::translate(identity, glm::vec3(MOON_ORBITAL_RADIUS_MILES, 0., 0.
+	));
+	/* 1. */ glm::mat4 mrspiny = glm::rotate(identity, moonSpinAngle, yaxis);
+	//printf("MOON_ORBIT_KM: %.*f\n", 12, MOON_ORBITAL_RADIUS_MILES);
+	return erorbity * etransx * mrorbity * mtransx * mrspiny; // 5 * 4 * 3 * 2 * 1
+}
 
 // draw the complete scene:
 
@@ -473,6 +494,45 @@ Display()
 			up.x, up.y, up.z);
 	}
 
+	else if (WhichPOV == MOONVIEW) {
+		// Latitude and Longitude
+		float y = MOON_RADIUS_MILES * sinf(0.);
+		float xz = cosf(0.);
+		float x = MOON_RADIUS_MILES * xz * cosf(180.);
+		float z = MOON_RADIUS_MILES * xz * sinf(180.);
+
+		m = MakeMoonMatrix();
+
+		// float eye[4] = { x, y, z, 1. };
+		eye.x = x; eye.y = y; eye.z = z;
+		eye = m * eye;
+
+		// float look[4] = { x+z, y, z-x, 1. };
+		look.x = x + z; look.y = y; look.z = z - x;
+		look = m * look;
+
+		// float up[4] = { x, y, z, 0. };
+		up.x = x; up.y = y; up.z = z;
+		up = m * up;
+
+
+		// // float eye[4] = { MOON_RADIUS_KM, 0., 0., 1. };
+		// eye.x = MOON_RADIUS_KM;
+		// eye = m * eye;
+		//
+		// // float look[4] = MOON_RADIUS_KM, 0., -1000., 1. };
+		// look.x = MOON_RADIUS_KM;
+		// look.z = -1000.;
+		// look = m * look;
+		//
+		// //float up[4] = {100 0., 0., 0., 0. };
+		// up.x = 1000.;
+		// up = m * up;
+
+		gluLookAt(eye.x, eye.y, eye.z, look.x, look.y, look.z,
+			up.x, up.y, up.z);
+	}
+
 	// since we are using glScalef( ), be sure the normals get unitized:
 
 	glEnable(GL_NORMALIZE);
@@ -521,7 +581,7 @@ Display()
 	glPopMatrix();
 
 	// draw moon
-
+	glm::mat4 moon = MakeMoonMatrix();
 	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
 	SetMaterial(1., 1., 1., 50.);
@@ -529,10 +589,12 @@ Display()
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glBindTexture(GL_TEXTURE_2D, moontex);
 	// 13, 365 / 28 ; month
-	glRotatef((sin(Time) * (ONE_FULL_TURN)), 0, 1., 0.);
-	glTranslatef(EARTH_ORBIT, 0, 0.);
-	glRotatef((sin(Time) * ((ONE_FULL_TURN) * MONTHS_PER_YEAR)), 0, 1., 0.);
-	glTranslatef(MOON_ORBIT, 0, 0.);
+	
+	//glRotatef((sin(Time) * (ONE_FULL_TURN)), 0, 1., 0.);
+	//glTranslatef(EARTH_ORBIT, 0, 0.);
+	//glRotatef((sin(Time) * ((ONE_FULL_TURN) * MONTHS_PER_YEAR)), 0, 1., 0.);
+	//glTranslatef(MOON_ORBIT, 0, 0.);
+	glMultMatrixf(glm::value_ptr(moon));
 	OsuSphere(MOON_RADIUS, 64., 64.);
 	glPopMatrix();
 
@@ -1251,8 +1313,8 @@ void
 SetPointLight(int ilight, float x, float y, float z, float r, float g, float b)
 {
 	glLightfv(ilight, GL_POSITION, Array3(x, y, z));
-	glLightfv(ilight, GL_AMBIENT, Array3(0.1, 0.1, 0.1));
-	//glLightfv(ilight, GL_AMBIENT, Array3(1, 1, 1));
+	//glLightfv(ilight, GL_AMBIENT, Array3(0.1, 0.1, 0.1));
+	glLightfv(ilight, GL_AMBIENT, Array3(1, 1, 1));
 	glLightfv(ilight, GL_DIFFUSE, Array3(r, g, b));
 	glLightfv(ilight, GL_SPECULAR, Array3(r, g, b));
 	glLightf(ilight, GL_CONSTANT_ATTENUATION, 1.);
