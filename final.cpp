@@ -114,10 +114,13 @@ const int RIGHT = 1;
 enum ViewVals
 {
 	OUTSIDE,
+	SIDEWAYS,
 	INSIDE,
 	EARTHVIEW,
 	MOONVIEW
 };
+
+int ORBIT_LINES_ON = 1;
 
 // which projection:
 
@@ -395,6 +398,8 @@ glm::mat4 MakeMoonMatrix()
 void
 Display()
 {
+	glm::mat4 moon = MakeMoonMatrix();
+	glm::mat4 earth = MakeEarthMatrix();
 
 	// set which window we want to do the graphics into:
 
@@ -455,7 +460,30 @@ Display()
 
 		// set the eye position, look-at position, and up-vector:
 
-		gluLookAt(3.3f, 0.f, 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
+		gluLookAt(0., 60.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f);
+		//gluLookAt(3.3f, 0.f, 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
+		//gluLookAt((3.3f), (sin(Time) * (ONE_FULL_TURN)), 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
+
+		// rotate the scene:
+
+		glRotatef((GLfloat)Yrot, 0.f, 1.f, 0.f);
+		glRotatef((GLfloat)Xrot, 1.f, 0.f, 0.f);
+
+		// uniformly scale the scene:
+
+		if (Scale < MINSCALE)
+			Scale = MINSCALE;
+		glScalef((GLfloat)Scale, (GLfloat)Scale, (GLfloat)Scale);
+
+	}
+
+	else if (WhichPOV == SIDEWAYS)
+	{
+
+		// set the eye position, look-at position, and up-vector:
+
+		//gluLookAt(0., 60.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f);
+		 gluLookAt(3.3f, 0.f, 70.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
 		//gluLookAt((3.3f), (sin(Time) * (ONE_FULL_TURN)), 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
 
 		// rotate the scene:
@@ -495,45 +523,55 @@ Display()
 	}
 
 	else if (WhichPOV == MOONVIEW) {
-		// Latitude and Longitude
-		float y = MOON_RADIUS_MILES * sinf(0.);
-		float xz = cosf(0.);
-		float x = MOON_RADIUS_MILES * xz * cosf(180.);
-		float z = MOON_RADIUS_MILES * xz * sinf(180.);
-
 		m = MakeMoonMatrix();
 
-		// float eye[4] = { x, y, z, 1. };
-		eye.x = x; eye.y = y; eye.z = z;
+		eye.x = MOON_RADIUS_MILES;
 		eye = m * eye;
 
-		// float look[4] = { x+z, y, z-x, 1. };
-		look.x = x + z; look.y = y; look.z = z - x;
+		look.x = MOON_RADIUS_MILES;
+		look.z = -1000.;
 		look = m * look;
 
-		// float up[4] = { x, y, z, 0. };
-		up.x = x; up.y = y; up.z = z;
+		up.x = 1000.;
+		//up.y = 1000.;
+		//up.z = 1000.;
 		up = m * up;
-
-
-		// // float eye[4] = { MOON_RADIUS_KM, 0., 0., 1. };
-		// eye.x = MOON_RADIUS_KM;
-		// eye = m * eye;
-		//
-		// // float look[4] = MOON_RADIUS_KM, 0., -1000., 1. };
-		// look.x = MOON_RADIUS_KM;
-		// look.z = -1000.;
-		// look = m * look;
-		//
-		// //float up[4] = {100 0., 0., 0., 0. };
-		// up.x = 1000.;
-		// up = m * up;
 
 		gluLookAt(eye.x, eye.y, eye.z, look.x, look.y, look.z,
 			up.x, up.y, up.z);
 	}
 
+	if (ORBIT_LINES_ON == 1){
 	// since we are using glScalef( ), be sure the normals get unitized:
+	glPushMatrix();
+	glColor3f(1, 0, 0);
+	glRotatef(90, 1, 0., 0.);
+	float dang = 2. * M_PI / (float)(99);
+	float ang = 0.;
+	glBegin(GL_LINE_LOOP);
+	for (int i = 0; i < 100; i++)
+	{
+		glVertex3f((EARTH_ORBITAL_RADIUS_MILES) * cos(ang), (EARTH_ORBITAL_RADIUS_MILES) * sin(ang), 0.);
+		ang += dang;
+	}
+	glEnd();
+	glPopMatrix();
+
+	glPushMatrix();
+	glMultMatrixf(glm::value_ptr(earth));
+	glColor3f(1, 0, 0);
+	glRotatef(90, 1, 0., 0.);
+	dang = 2. * M_PI / (float)(99);
+	ang = 0.;
+	glBegin(GL_LINE_LOOP);
+	for (int i = 0; i < 100; i++)
+	{
+		glVertex3f((MOON_ORBITAL_RADIUS_MILES)*cos(ang), (MOON_ORBITAL_RADIUS_MILES)*sin(ang), 0.);
+		ang += dang;
+	}
+	glEnd();
+	glPopMatrix();
+	}
 
 	glEnable(GL_NORMALIZE);
 	//glEnable(GL_LIGHTING);	// enable lighting
@@ -564,7 +602,7 @@ Display()
 
 	// creating the objects/spheres
 
-	glm::mat4 earth = MakeEarthMatrix();
+	
 
 	// draw earth
 	glShadeModel(GL_SMOOTH);
@@ -581,7 +619,7 @@ Display()
 	glPopMatrix();
 
 	// draw moon
-	glm::mat4 moon = MakeMoonMatrix();
+	
 	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
 	SetMaterial(1., 1., 1., 50.);
@@ -778,6 +816,7 @@ InitMenus()
 	// viewing options
 	int viewmenu = glutCreateMenu(DoViewMenu);
 	glutAddMenuEntry("Outside", OUTSIDE);
+	glutAddMenuEntry("Sideways", SIDEWAYS);
 	glutAddMenuEntry("Inside", INSIDE);
 	glutAddMenuEntry("Earthview", EARTHVIEW);
 	glutAddMenuEntry("Moonview", MOONVIEW);
@@ -1074,7 +1113,20 @@ Keyboard(unsigned char c, int x, int y)
 	case 'o':
 	case 'O':
 		WhichPOV = OUTSIDE;
+		Reset();
 		break;
+
+	case 's':
+	case 'S':
+		WhichPOV = SIDEWAYS;
+		Reset();
+		break;
+
+	case 'r':
+	case 'R':
+		Reset();
+		break;
+
 	case 'e':
 	case 'E':
 		WhichPOV = EARTHVIEW;
@@ -1084,6 +1136,17 @@ Keyboard(unsigned char c, int x, int y)
 	case 'M':
 		WhichPOV = MOONVIEW;
 		break;
+
+	case 'c':
+	case 'C':
+		ORBIT_LINES_ON = 1;
+		break;
+
+	case 'v':
+	case 'V':
+		ORBIT_LINES_ON = 0;
+		break;
+
 	case '0':	// entering '0' will turn on/off the first/white light 
 	case '6':
 		Light0On = !Light0On;
@@ -1313,8 +1376,8 @@ void
 SetPointLight(int ilight, float x, float y, float z, float r, float g, float b)
 {
 	glLightfv(ilight, GL_POSITION, Array3(x, y, z));
-	//glLightfv(ilight, GL_AMBIENT, Array3(0.1, 0.1, 0.1));
-	glLightfv(ilight, GL_AMBIENT, Array3(1, 1, 1));
+	glLightfv(ilight, GL_AMBIENT, Array3(0.1, 0.1, 0.1));
+	//glLightfv(ilight, GL_AMBIENT, Array3(1, 1, 1));
 	glLightfv(ilight, GL_DIFFUSE, Array3(r, g, b));
 	glLightfv(ilight, GL_SPECULAR, Array3(r, g, b));
 	glLightf(ilight, GL_CONSTANT_ATTENUATION, 1.);
