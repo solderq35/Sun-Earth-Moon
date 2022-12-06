@@ -301,7 +301,7 @@ Animate()
 {
 	// put animation stuff in here -- change some global variables
 	// for Display( ) to find:
-	const int MS_IN_THE_ANIMATION_CYCLE = 300000;
+	const int MS_IN_THE_ANIMATION_CYCLE = 700000;
 	int ms = glutGet(GLUT_ELAPSED_TIME);
 	ms %= MS_IN_THE_ANIMATION_CYCLE;
 	Time = ((float)ms / (float)MS_IN_THE_ANIMATION_CYCLE);
