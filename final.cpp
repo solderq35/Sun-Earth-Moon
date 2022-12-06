@@ -24,7 +24,6 @@
 #include <GL/glu.h>
 #include "glut.h"
 #include "osusphere.cpp"
-#include "osutorus.cpp"
 
 //	This is a sample OpenGL / GLUT program
 //
@@ -44,86 +43,70 @@
 //
 //	Author:			Jeff Huang
 
-const float SUN_RADIUS = 15.0;
-const float EARTH_RADIUS = 2;
-const float EARTH_ORBIT = 45;
-const float MOON_RADIUS = 2 * (1079.6 / 3964.19);
-const float MOON_ORBIT = 3;
-//const float ONE_FULL_TURN = 360. / sin(1.);
-const float ONE_FULL_TURN = 2 * M_PI;
-const float MONTHS_PER_YEAR = 365. / 28.;
-const float DAYS_PER_YEAR = 365;
-int		WhichPOV;				// outside or inside view
-const float EARTH_ORBIT_TIME_SECONDS = 200;
-const float EARTH_SPIN_TIME_SECONDS = 200 / 365.;
-const float EARTH_RADIUS_MILES = 2;
-const float EARTH_ORBITAL_RADIUS_MILES = 45;
-const float MOON_ORBITAL_RADIUS_MILES = 4;
-const float MOON_RADIUS_MILES = 2 * 1079.6 / 3964.19;
+const float ONE_FULL_TURN = 2 * M_PI;					// base turn for one full turn
+const float DAYS_PER_MONTH = 27.3;						// Earth rotates ~27.3 times for each time the moon revolves around earth
+const float DAYS_PER_YEAR = 365.3;						// Earth rotates ~365 times for each time it revolves around sun
+const float MONTHS_PER_YEAR = DAYS_PER_YEAR / DAYS_PER_MONTH;	// Moon revolves around earth ~13 times for each time earth revolves around the sun
+int		WhichPOV;										// outside(top), sideways, earth, moon view
+const float SUN_RADIUS_MILES = 15.0;					// sun's radius (exaggerated to be smaller relative to earth and moon)
+const float EARTH_RADIUS_MILES = 2;						// earth's radius (accurate ratio with moon's radius)
+const float EARTH_ORBITAL_RADIUS_MILES = 45;			// earth's orbital radius (exaggerated to be smaller relative to moon's orbital radius)
+const float MOON_RADIUS_MILES = EARTH_RADIUS_MILES * 1079.6 / 3964.19;	// moon's radius (accurate ratio with moon's radius, moon radius is ~1/4 of earth radius)
+const float MOON_ORBITAL_RADIUS_MILES = 4;				// moon's orbital radius (exaggerated to be bigger relative to earth's orbital radius)
 
 // number of times object moves per cycle
 const int NUM_BACK_AND_FORTH_PER_CYCLE = 1;
 
 // title of these windows:
-
 const char* WINDOWTITLE = "Final Project -- Jeff Huang";
 const char* GLUITITLE = "User Interface Window";
 
 // what the glui package defines as true and false:
-
 const int GLUITRUE = true;
 const int GLUIFALSE = false;
 
 // the escape key:
-
 const int ESCAPE = 0x1b;
 
 // initial window size:
-
 const int INIT_WINDOW_SIZE = 600;
 
 // size of the 3d box to be drawn:
-
 const float BOXSIZE = 2.f;
 
 // multiplication factors for input interaction:
 //  (these are known from previous experience)
-
 const float ANGFACT = 1.f;
 const float SCLFACT = 0.005f;
 
 // minimum allowable scale factor:
-
 const float MINSCALE = 0.05f;
 
 // scroll wheel button values:
-
 const int SCROLL_WHEEL_UP = 3;
 const int SCROLL_WHEEL_DOWN = 4;
 
 // equivalent mouse movement when we click the scroll wheel:
-
 const float SCROLL_WHEEL_CLICK_FACTOR = 5.f;
 
 // active mouse buttons (or them together):
-
 const int LEFT = 4;
 const int MIDDLE = 2;
 const int RIGHT = 1;
 
+// viewing options
 enum ViewVals
 {
 	OUTSIDE,
 	SIDEWAYS,
-	INSIDE,
 	EARTHVIEW,
 	MOONVIEW
 };
 
+// initialize orbit lines as on
 int ORBIT_LINES_ON = 1;
 
 // which projection:
-
 enum Projections
 {
 	ORTHO,
@@ -131,7 +114,6 @@ enum Projections
 };
 
 // which button:
-
 enum ButtonVals
 {
 	RESET,
@@ -139,17 +121,14 @@ enum ButtonVals
 };
 
 // window background color (rgba):
-
 const GLfloat BACKCOLOR[] = { 0., 0., 0., 1. };
 
 // line width for the axes:
-
 const GLfloat AXES_WIDTH = 3.;
 
 // the color numbers:
 // this order must match the radio button order, which must match the order of the color names,
 // 	which must match the order of the color RGB values
-
 enum Colors
 {
 	RED,
@@ -176,7 +155,6 @@ char* ColorNames[] =
 
 // the color definitions:
 // this order must match the menu order
-
 const GLfloat Colors[][3] =
 {
 	{ 1., 0., 0. },		// red
@@ -190,7 +168,6 @@ const GLfloat Colors[][3] =
 };
 
 // fog parameters:
-
 const GLfloat FOGCOLOR[4] = { .0f, .0f, .0f, 1.f };
 const GLenum  FOGMODE = GL_LINEAR;
 const GLfloat FOGDENSITY = 0.30f;
@@ -207,12 +184,11 @@ const GLfloat FOGEND = 4.f;
 
 
 // non-constant global variables:
-
 int		ActiveButton;			// current button that is down
-GLuint  worldtex;               // list to hold world map texture
 GLuint  moontex;
 GLuint  earthtex;
 GLuint  suntex;
+GLuint  starstex;
 GLuint	AxesList;				// list to hold the axes
 int		AxesOn;					// != 0 means to draw the axes
 int		DebugOn;				// != 0 means to print debugging info
@@ -220,6 +196,12 @@ int		DepthCueOn;				// != 0 means to use intensity depth cueing
 int		DepthBufferOn;			// != 0 means to use the z-buffer
 int		DepthFightingOn;		// != 0 means to force the creation of z-fighting
 GLuint	BoxList;				// object display list
+GLuint	SunList;				// display list for sun
+GLuint	StarsList;				// display list for stars
+GLuint  MoonOrbitList;			// display list for moon orbit circle
+GLuint  EarthOrbitList;			// display list for earth's orbit circle
+GLuint  EarthList;				// display list for earth
+GLuint  MoonList;				// display list for moon
 int		MainWindow;				// window id for main graphics window
 float	Scale;					// scaling factor
 int		ShadowsOn;				// != 0 means to turn shadows on
@@ -232,11 +214,13 @@ bool	Light0On, Frozen; // checking if the lights should be turned on or if all o
 
 
 // function prototypes:
-
 void	Animate();
 void	Display();
 void	DoAxesMenu(int);
+void	DoLightsMenu(int);
 void	DoColorMenu(int);
+void	DoFreezeMenu(int);
+void	DoOrbitLinesMenu(int);
 void	DoDepthBufferMenu(int);
 void	DoDepthFightingMenu(int);
 void	DoDepthMenu(int);
@@ -267,14 +251,11 @@ int				ReadInt(FILE*);
 short			ReadShort(FILE*);
 
 void			HsvRgb(float[3], float[3]);
-
 void			Cross(float[3], float[3], float[3]);
 float			Dot(float[3], float[3]);
 float			Unit(float[3], float[3]);
 
-
 // main program:
-
 int
 main(int argc, char* argv[])
 {
@@ -285,25 +266,20 @@ main(int argc, char* argv[])
 	glutInit(&argc, argv);
 
 	// setup all the graphics stuff:
-
 	InitGraphics();
 
 	// create the display structures that will not change:
-
 	InitLists();
 
 	// init all the global variables used by Display( ):
 	// this will also post a redisplay
-
 	Reset();
 
 	// setup all the user interface stuff:
-
 	InitMenus();
 
 	// draw the scene once and wait for some interaction:
 	// (this will never return)
-
 	glutSetWindow(MainWindow);
 	glutMainLoop();
 
@@ -320,20 +296,17 @@ main(int argc, char* argv[])
 // this is typically where animation parameters are set
 //
 // do not call Display( ) from here -- let glutPostRedisplay( ) do it
-
 void
 Animate()
 {
 	// put animation stuff in here -- change some global variables
 	// for Display( ) to find:
-
-	const int MS_IN_THE_ANIMATION_CYCLE = 200000;
+	const int MS_IN_THE_ANIMATION_CYCLE = 300000;
 	int ms = glutGet(GLUT_ELAPSED_TIME);
 	ms %= MS_IN_THE_ANIMATION_CYCLE;
 	Time = ((float)ms / (float)MS_IN_THE_ANIMATION_CYCLE);
 
 	// force a call to Display( ) next time it is convenient:
-
 	glutSetWindow(MainWindow);
 	glutPostRedisplay();
 }
@@ -365,32 +338,30 @@ SetViewingFromLatLng(float eyeLat, float eyeLng, float lookLat, float lookLng, f
 glm::mat4
 MakeEarthMatrix()
 {
-	float earthSpinAngle = Time * ONE_FULL_TURN * 30 * 10;
-	float earthOrbitAngle = Time * ONE_FULL_TURN * 10;
+	float earthSpinAngle = Time * ONE_FULL_TURN * DAYS_PER_YEAR;
+	float earthOrbitAngle = Time * ONE_FULL_TURN;
 	glm::mat4 identity = glm::mat4(1.);
 	glm::vec3 yaxis = glm::vec3(0., 1., 0.);
-	/* 3. */ glm::mat4 erorbity = glm::rotate(identity, earthOrbitAngle, yaxis);
-	/* 2. */ glm::mat4 etransx = glm::translate(identity, glm::vec3(EARTH_ORBITAL_RADIUS_MILES, 0., 0.));/* 1. */ glm::mat4 erspiny = glm::rotate(identity, earthSpinAngle, yaxis);
-	return erorbity * etransx * erspiny; // 3 * 2 * 1
-	//printf("EARTH_ORBIT_KM: %.*f\n", 12, EARTH_ORBITAL_RADIUS_MILES);
+	glm::mat4 erorbity = glm::rotate(identity, earthOrbitAngle, yaxis);
+	glm::mat4 etransx = glm::translate(identity, glm::vec3(EARTH_ORBITAL_RADIUS_MILES, 0., 0.));/* 1. */ glm::mat4 erspiny = glm::rotate(identity, earthSpinAngle, yaxis);
+	return erorbity * etransx * erspiny;
 }
 
 glm::mat4 MakeMoonMatrix()
 {
-	float moonSpinAngle = Time * ONE_FULL_TURN * 10 * 12.;
-	float moonOrbitAngle = Time * ONE_FULL_TURN * 10 * 12.;
-	float earthOrbitAngle = Time * ONE_FULL_TURN * 10;
+	float moonSpinAngle = Time * ONE_FULL_TURN * MONTHS_PER_YEAR;
+	float moonOrbitAngle = Time * ONE_FULL_TURN * MONTHS_PER_YEAR;
+	float earthOrbitAngle = Time * ONE_FULL_TURN;
 	glm::mat4 identity = glm::mat4(1.);
 	glm::vec3 yaxis = glm::vec3(0., 1., 0.);
 
-	/* 5. */ glm::mat4 erorbity = glm::rotate(identity, earthOrbitAngle, yaxis);
-	/* 4. */ glm::mat4 etransx = glm::translate(identity, glm::vec3(EARTH_ORBITAL_RADIUS_MILES, 0., 0.));
-	/* 3. */ glm::mat4 mrorbity = glm::rotate(identity, moonOrbitAngle, yaxis);
-	/* 2. */ glm::mat4 mtransx = glm::translate(identity, glm::vec3(MOON_ORBITAL_RADIUS_MILES, 0., 0.
+	glm::mat4 erorbity = glm::rotate(identity, earthOrbitAngle, yaxis);
+	glm::mat4 etransx = glm::translate(identity, glm::vec3(EARTH_ORBITAL_RADIUS_MILES, 0., 0.));
+	glm::mat4 mrorbity = glm::rotate(identity, moonOrbitAngle, yaxis);
+	glm::mat4 mtransx = glm::translate(identity, glm::vec3(MOON_ORBITAL_RADIUS_MILES, 0., 0.
 	));
-	/* 1. */ glm::mat4 mrspiny = glm::rotate(identity, moonSpinAngle, yaxis);
-	//printf("MOON_ORBIT_KM: %.*f\n", 12, MOON_ORBITAL_RADIUS_MILES);
-	return erorbity * etransx * mrorbity * mtransx * mrspiny; // 5 * 4 * 3 * 2 * 1
+	glm::mat4 mrspiny = glm::rotate(identity, moonSpinAngle, yaxis);
+	return erorbity * etransx * mrorbity * mtransx * mrspiny;
 }
 
 // draw the complete scene:
@@ -410,16 +381,12 @@ Display()
 
 	glDrawBuffer(GL_BACK);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 	glEnable(GL_DEPTH_TEST);
 
 	// specify shading to be flat:
-
 	glShadeModel(GL_FLAT);
 
-
 	// set the viewport to a square centered in the window:
-
 	GLsizei vx = glutGet(GLUT_WINDOW_WIDTH);
 	GLsizei vy = glutGet(GLUT_WINDOW_HEIGHT);
 	GLsizei v = vx < vy ? vx : vy;			// minimum dimension
@@ -437,40 +404,34 @@ Display()
 	// remember that the Z clipping  values are actually
 	// given as DISTANCES IN FRONT OF THE EYE
 	// USE gluOrtho2D( ) IF YOU ARE DOING 2D !
-
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	gluPerspective(90., 1., 0.1, 1000.);
 
 
 	// place the objects into the scene:
-
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	glm::mat4 e, m;
-	glm::vec4 eye = glm::vec4(0., 0., 0., 1.);
-	glm::vec4 look = glm::vec4(0., 0., 0., 1.);
-	glm::vec4 up = glm::vec4(0., 0., 0., 0.); // vectors don’t get translations
+	glm::mat4 e;
+	glm::vec4 eyePos = glm::vec4(0., 0., 0., 1.);
+	glm::vec4 lookPos = glm::vec4(0., 0., 0., 1.);
+	glm::vec4 upVec = glm::vec4(0., 0., 0., 0.); // vectors don’t get translations
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	
 	if (WhichPOV == OUTSIDE)
 	{
-
 		// set the eye position, look-at position, and up-vector:
-
 		gluLookAt(0., 60.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f);
 		//gluLookAt(3.3f, 0.f, 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
 		//gluLookAt((3.3f), (sin(Time) * (ONE_FULL_TURN)), 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
 
 		// rotate the scene:
-
 		glRotatef((GLfloat)Yrot, 0.f, 1.f, 0.f);
 		glRotatef((GLfloat)Xrot, 1.f, 0.f, 0.f);
 
 		// uniformly scale the scene:
-
 		if (Scale < MINSCALE)
 			Scale = MINSCALE;
 		glScalef((GLfloat)Scale, (GLfloat)Scale, (GLfloat)Scale);
@@ -481,176 +442,123 @@ Display()
 	{
 
 		// set the eye position, look-at position, and up-vector:
-
 		//gluLookAt(0., 60.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f);
 		 gluLookAt(3.3f, 0.f, 70.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
 		//gluLookAt((3.3f), (sin(Time) * (ONE_FULL_TURN)), 80.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f);
 
 		// rotate the scene:
-
 		glRotatef((GLfloat)Yrot, 0.f, 1.f, 0.f);
 		glRotatef((GLfloat)Xrot, 1.f, 0.f, 0.f);
 
 		// uniformly scale the scene:
-
 		if (Scale < MINSCALE)
 			Scale = MINSCALE;
 		glScalef((GLfloat)Scale, (GLfloat)Scale, (GLfloat)Scale);
 
 	}
 
-	else if (WhichPOV == INSIDE) {
-		gluLookAt(0., 1.2, 1., 0., 5., 10., 0., 1., 0.);
-	}
-
 	else if (WhichPOV == EARTHVIEW) {
-		m = MakeEarthMatrix();
+		e = MakeEarthMatrix();
+		//SetViewingFromLatLng(0., 0., 0., -10., EARTH_RADIUS_MILES, &eye, &look);
 
-		eye.x = EARTH_RADIUS;
-		eye = m * eye;
+		// set eye position somewhere on the earth's equator
+		eyePos.x = EARTH_RADIUS_MILES;
+		eyePos = e * eyePos;
 
-		look.x = EARTH_RADIUS;
-		look.z = -1000.;
-		look = m * look;
+		// set look direction to be tangent across earth's surface
+		lookPos.x = EARTH_RADIUS_MILES;
+		lookPos.z = -1000.;
+		lookPos = e * lookPos;
 
-		up.x = 1000.;
-		//up.y = 1000.;
-		//up.z = 1000.;
-		up = m * up;
+		// set up direction to be positive x
+		//upVec = glm::vec4(glm::normalize(glm::vec3(eyePos.x)),0);
+		upVec.x = 1000.;
+		//upVec.y = 1000.;
+		//upVec.z = 1000.;
+		upVec = e * upVec;
 
-		gluLookAt(eye.x, eye.y, eye.z, look.x, look.y, look.z,
-			up.x, up.y, up.z);
+		gluLookAt(eyePos.x, eyePos.y, eyePos.z, lookPos.x, lookPos.y, lookPos.z,
+			upVec.x, upVec.y, upVec.z);
 	}
 
 	else if (WhichPOV == MOONVIEW) {
-		m = MakeMoonMatrix();
+		e = MakeMoonMatrix();
 
-		eye.x = MOON_RADIUS_MILES;
-		eye = m * eye;
+		// set eye position somewhere on the moon's equator
+		eyePos.x = MOON_RADIUS_MILES;
+		eyePos = e * eyePos;
 
-		look.x = MOON_RADIUS_MILES;
-		look.z = -1000.;
-		look = m * look;
+		// set look direction to be tangent across moon's surface
+		lookPos.x = MOON_RADIUS_MILES;
+		lookPos.z = -1000.;
+		lookPos = e * lookPos;
 
-		up.x = 1000.;
-		//up.y = 1000.;
-		//up.z = 1000.;
-		up = m * up;
+		// set up direction to be positive x
+		upVec.x = 1000.;
+		//upVec.y = 1000.;
+		//upVec.z = 1000.;
+		upVec = e * upVec;
 
-		gluLookAt(eye.x, eye.y, eye.z, look.x, look.y, look.z,
-			up.x, up.y, up.z);
+		gluLookAt(eyePos.x, eyePos.y, eyePos.z, lookPos.x, lookPos.y, lookPos.z,
+			upVec.x, upVec.y, upVec.z);
 	}
 
+	// turn orbital path lines on or off
 	if (ORBIT_LINES_ON == 1){
-	// since we are using glScalef( ), be sure the normals get unitized:
-	glPushMatrix();
-	glColor3f(1, 0, 0);
-	glRotatef(90, 1, 0., 0.);
-	float dang = 2. * M_PI / (float)(99);
-	float ang = 0.;
-	glBegin(GL_LINE_LOOP);
-	for (int i = 0; i < 100; i++)
-	{
-		glVertex3f((EARTH_ORBITAL_RADIUS_MILES) * cos(ang), (EARTH_ORBITAL_RADIUS_MILES) * sin(ang), 0.);
-		ang += dang;
-	}
-	glEnd();
-	glPopMatrix();
+		glPushMatrix();
+		glCallList(EarthOrbitList);
+		glPopMatrix();
 
-	glPushMatrix();
-	glMultMatrixf(glm::value_ptr(earth));
-	glColor3f(1, 0, 0);
-	glRotatef(90, 1, 0., 0.);
-	dang = 2. * M_PI / (float)(99);
-	ang = 0.;
-	glBegin(GL_LINE_LOOP);
-	for (int i = 0; i < 100; i++)
-	{
-		glVertex3f((MOON_ORBITAL_RADIUS_MILES)*cos(ang), (MOON_ORBITAL_RADIUS_MILES)*sin(ang), 0.);
-		ang += dang;
-	}
-	glEnd();
-	glPopMatrix();
+		glPushMatrix();
+		glMultMatrixf(glm::value_ptr(earth));
+		glCallList(MoonOrbitList);
+		glPopMatrix();
 	}
 
 	glEnable(GL_NORMALIZE);
-	//glEnable(GL_LIGHTING);	// enable lighting
 
 	// create sun light
-	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
-	SetMaterial(1., 1., 1., 50.);
-	glEnable(GL_TEXTURE_2D);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	glBindTexture(GL_TEXTURE_2D, suntex);
-	//glTranslatef(1., 1., 1.);
-	glColor3f(1., 1., 1.);
-	OsuSphere(SUN_RADIUS, 64., 64.);
-	//OsuSphere(0.1, 64., 64.);
-	SetPointLight(GL_LIGHT0, 0., 0., 0., 1., 1., 1.);
+	glCallList(SunList);
 	glPopMatrix();
 
-
 	// checking if the sun light is on
-
 	if (Light0On)
 		glEnable(GL_LIGHT0);
 	else
 		glDisable(GL_LIGHT0);
 
+	// create sphere around the whole scene textured with stars (milky way) pattern
+	glPushMatrix();
+	glCallList(StarsList);
+	glPopMatrix();
+	
 	glEnable(GL_LIGHTING);	// enable lighting
 
 	// creating the objects/spheres
-
-	
-
 	// draw earth
-	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
-	SetMaterial(1., 1., 1., 50.);
-	glEnable(GL_TEXTURE_2D);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	glBindTexture(GL_TEXTURE_2D, earthtex);
-	//glRotatef((sin(Time) * (ONE_FULL_TURN)), 0, 1., 0.);
-	//glTranslatef(EARTH_ORBIT, 0, 0.);
-	//glRotatef((sin(Time) * (ONE_FULL_TURN * DAYS_PER_YEAR)), 0, 1., 0.);
 	glMultMatrixf(glm::value_ptr(earth));
-	OsuSphere(EARTH_RADIUS, 64., 64.);
+	glCallList(EarthList);
 	glPopMatrix();
 
 	// draw moon
-	
-	glShadeModel(GL_SMOOTH);
 	glPushMatrix();
-	SetMaterial(1., 1., 1., 50.);
-	glEnable(GL_TEXTURE_2D);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	glBindTexture(GL_TEXTURE_2D, moontex);
-	// 13, 365 / 28 ; month
-	
-	//glRotatef((sin(Time) * (ONE_FULL_TURN)), 0, 1., 0.);
-	//glTranslatef(EARTH_ORBIT, 0, 0.);
-	//glRotatef((sin(Time) * ((ONE_FULL_TURN) * MONTHS_PER_YEAR)), 0, 1., 0.);
-	//glTranslatef(MOON_ORBIT, 0, 0.);
 	glMultMatrixf(glm::value_ptr(moon));
-	OsuSphere(MOON_RADIUS, 64., 64.);
+	glCallList(MoonList);
 	glPopMatrix();
 
 	glDisable(GL_LIGHTING);
 
 	// swap the double-buffered framebuffers:
-
 	glutSwapBuffers();
 
 	// be sure the graphics buffer has been sent:
 	// note: be sure to use glFlush( ) here, not glFinish( ) !
-
 	glFlush();
 }
 
-
-void
-DoAxesMenu(int id)
+void DoAxesMenu(int id)
 {
 	AxesOn = id;
 
@@ -658,6 +566,48 @@ DoAxesMenu(int id)
 	glutPostRedisplay();
 }
 
+// menu for setting the views (earthview, moonview, outside(top), sideview)
+void
+DoViewMenu(int id)
+{
+	WhichPOV = id;
+	Reset();
+	glutSetWindow(MainWindow);
+	glutPostRedisplay();
+}
+
+// menu for turning orbit lines on and off
+void
+DoOrbitLinesMenu(int id)
+{
+	ORBIT_LINES_ON = id;
+
+	glutSetWindow(MainWindow);
+	glutPostRedisplay();
+}
+
+// menu for freezing animation
+void
+DoFreezeMenu(int id)
+{
+	Frozen = id;
+	if (Frozen)
+		glutIdleFunc(NULL);
+	else
+		glutIdleFunc(Animate);
+	glutSetWindow(MainWindow);
+	glutPostRedisplay();
+}
+
+// menu for turning lights on and off
+void
+DoLightsMenu(int id)
+{
+	Light0On = id;
+
+	glutSetWindow(MainWindow);
+	glutPostRedisplay();
+}
 
 void
 DoColorMenu(int id)
@@ -667,7 +617,6 @@ DoColorMenu(int id)
 	glutSetWindow(MainWindow);
 	glutPostRedisplay();
 }
-
 
 void
 DoDebugMenu(int id)
@@ -708,18 +657,7 @@ DoDepthMenu(int id)
 	glutPostRedisplay();
 }
 
-
-void
-DoViewMenu(int id)
-{
-	WhichPOV = id;
-
-	glutSetWindow(MainWindow);
-	glutPostRedisplay();
-}
-
 // main menu callback:
-
 void
 DoMainMenu(int id)
 {
@@ -797,11 +735,9 @@ float
 ElapsedSeconds()
 {
 	// get # of milliseconds since the start of the program:
-
 	int ms = glutGet(GLUT_ELAPSED_TIME);
 
 	// convert it to seconds:
-
 	return (float)ms / 1000.f;
 }
 
@@ -815,9 +751,8 @@ InitMenus()
 
 	// viewing options
 	int viewmenu = glutCreateMenu(DoViewMenu);
-	glutAddMenuEntry("Outside", OUTSIDE);
+	glutAddMenuEntry("Outside (Top)", OUTSIDE);
 	glutAddMenuEntry("Sideways", SIDEWAYS);
-	glutAddMenuEntry("Inside", INSIDE);
 	glutAddMenuEntry("Earthview", EARTHVIEW);
 	glutAddMenuEntry("Moonview", MOONVIEW);
 
@@ -829,33 +764,48 @@ InitMenus()
 	}
 
 	int axesmenu = glutCreateMenu(DoAxesMenu);
-	glutAddMenuEntry("Off", 0);
 	glutAddMenuEntry("On", 1);
+	glutAddMenuEntry("Off", 0);
 
-	int depthcuemenu = glutCreateMenu(DoDepthMenu);
-	glutAddMenuEntry("Off", 0);
+	int orbit_lines_menu = glutCreateMenu(DoOrbitLinesMenu);
 	glutAddMenuEntry("On", 1);
+	glutAddMenuEntry("Off", 0);
 
-	int depthbuffermenu = glutCreateMenu(DoDepthBufferMenu);
-	glutAddMenuEntry("Off", 0);
+	int freezemenu = glutCreateMenu(DoFreezeMenu);
+	glutAddMenuEntry("Freeze Animation", 1);
+	glutAddMenuEntry("Turn Animation On", 0);
+	
+	int lightsmenu = glutCreateMenu(DoLightsMenu);
 	glutAddMenuEntry("On", 1);
+	glutAddMenuEntry("Off", 0);
+	
+	//int depthcuemenu = glutCreateMenu(DoDepthMenu);
+	//glutAddMenuEntry("Off", 0);
+	//glutAddMenuEntry("On", 1);
 
-	int depthfightingmenu = glutCreateMenu(DoDepthFightingMenu);
-	glutAddMenuEntry("Off", 0);
-	glutAddMenuEntry("On", 1);
+	//int depthbuffermenu = glutCreateMenu(DoDepthBufferMenu);
+	//glutAddMenuEntry("Off", 0);
+	//glutAddMenuEntry("On", 1);
+
+	//int depthfightingmenu = glutCreateMenu(DoDepthFightingMenu);
+	//glutAddMenuEntry("Off", 0);
+	//glutAddMenuEntry("On", 1);
 
 	int debugmenu = glutCreateMenu(DoDebugMenu);
 	glutAddMenuEntry("Off", 0);
 	glutAddMenuEntry("On", 1);
 
-	int projmenu = glutCreateMenu(DoProjectMenu);
-	glutAddMenuEntry("Orthographic", ORTHO);
-	glutAddMenuEntry("Perspective", PERSP);
+	//int projmenu = glutCreateMenu(DoProjectMenu);
+	//glutAddMenuEntry("Orthographic", ORTHO);
+	//glutAddMenuEntry("Perspective", PERSP);
 
 	int mainmenu = glutCreateMenu(DoMainMenu);
 	glutAddSubMenu("Views", viewmenu);
-	glutAddSubMenu("Axes", axesmenu);
-	glutAddSubMenu("Axis Colors", colormenu);
+	glutAddSubMenu("Light", lightsmenu);
+	glutAddSubMenu("Freeze Animation", freezemenu);
+	glutAddSubMenu("Orbit Lines", orbit_lines_menu);
+	//glutAddSubMenu("Axes", axesmenu);
+	//glutAddSubMenu("Axis Colors", colormenu);
 
 #ifdef DEMO_DEPTH_BUFFER
 	glutAddSubMenu("Depth Buffer", depthbuffermenu);
@@ -865,8 +815,8 @@ InitMenus()
 	glutAddSubMenu("Depth Fighting", depthfightingmenu);
 #endif
 
-	glutAddSubMenu("Depth Cue", depthcuemenu);
-	glutAddSubMenu("Projection", projmenu);
+	//glutAddSubMenu("Depth Cue", depthcuemenu);
+	//glutAddSubMenu("Projection", projmenu);
 	glutAddMenuEntry("Reset", RESET);
 	glutAddSubMenu("Debug", debugmenu);
 	glutAddMenuEntry("Quit", QUIT);
@@ -880,7 +830,6 @@ InitMenus()
 
 // initialize the glut and OpenGL libraries:
 //	also setup callback functions
-
 void
 InitGraphics()
 {
@@ -945,22 +894,10 @@ InitGraphics()
 	glutTimerFunc(-1, NULL, 0);
 	glutIdleFunc(Animate);
 
-	glGenTextures(1, &worldtex);
-
-	// texture image settings
-
-	int width = 2, height = 2;
-	unsigned char* t32 = BmpToTexture("roshar.bmp", &width, &height);
-
-	glBindTexture(GL_TEXTURE_2D, worldtex);
-
+	// moon texture settings
 	glGenTextures(1, &moontex);
-
-	// texture image settings
-
-	width = 2, height = 2;
-	t32 = BmpToTexture("moon.bmp", &width, &height);
-
+	int width = 2, height = 2;
+	unsigned char* t32 = BmpToTexture("moon.bmp", &width, &height);
 	glBindTexture(GL_TEXTURE_2D, moontex);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -970,13 +907,10 @@ InitGraphics()
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, t32);
 
+	// earth texture settings
 	glGenTextures(1, &earthtex);
-
-	// texture image settings
-
 	width = 2, height = 2;
 	t32 = BmpToTexture("earth.bmp", &width, &height);
-
 	glBindTexture(GL_TEXTURE_2D, earthtex);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -986,13 +920,23 @@ InitGraphics()
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, t32);
 
+	// sun texture settings
+	glGenTextures(1, &starstex);
+	width = 2, height = 2;
+	t32 = BmpToTexture("stars.bmp", &width, &height);
+	glBindTexture(GL_TEXTURE_2D, starstex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+	glTexImage2D(GL_TEXTURE_2D, 0, 3, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, t32);
+
+	// sun texture settings
 	glGenTextures(1, &suntex);
-
-	// texture image settings
-
 	width = 2, height = 2;
 	t32 = BmpToTexture("sun.bmp", &width, &height);
-
 	glBindTexture(GL_TEXTURE_2D, suntex);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1022,7 +966,6 @@ InitGraphics()
 // (a display list is a way to store opengl commands in
 //  memory so that they can be played back efficiently at a later time
 //  with a call to glCallList( )
-
 void
 InitLists()
 {
@@ -1084,9 +1027,85 @@ InitLists()
 
 	glEndList();
 
+	// earth display list
+	EarthOrbitList = glGenLists(1);
+		glNewList(EarthOrbitList, GL_COMPILE);
+		glColor3f(1, 0, 0);
+		glRotatef(90, 1, 0., 0.);
+		float dang = 2. * M_PI / (float)(99);
+		float ang = 0.;
+		glBegin(GL_LINE_LOOP);
+		for (int i = 0; i < 100; i++)
+		{
+			glVertex3f((EARTH_ORBITAL_RADIUS_MILES)*cos(ang), (EARTH_ORBITAL_RADIUS_MILES)*sin(ang), 0.);
+			ang += dang;
+		}
+		glEnd();
+	glEndList();
+
+	// moon display list
+	MoonOrbitList = glGenLists(1);
+		glNewList(MoonOrbitList, GL_COMPILE);
+		glColor3f(1, 0, 0);
+		glRotatef(90, 1, 0., 0.);
+		dang = 2. * M_PI / (float)(99);
+		ang = 0.;
+		glBegin(GL_LINE_LOOP);
+		for (int i = 0; i < 100; i++)
+		{
+			glVertex3f((MOON_ORBITAL_RADIUS_MILES)*cos(ang), (MOON_ORBITAL_RADIUS_MILES)*sin(ang), 0.);
+			ang += dang;
+		}
+		glEnd();
+	glEndList();
+
+	//sun display list
+	SunList = glGenLists(1);
+		glNewList(SunList, GL_COMPILE);
+		glShadeModel(GL_SMOOTH);
+		SetMaterial(1., 1., 1., 50.);
+		glEnable(GL_TEXTURE_2D);
+		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+		glBindTexture(GL_TEXTURE_2D, suntex);
+		glColor3f(1., 1., 1.);
+		OsuSphere(SUN_RADIUS_MILES, 64, 64);
+		SetPointLight(GL_LIGHT0, 0., 0., 0., 1., 1., 1.);
+	glEndList();
+
+	// stars display list
+	StarsList = glGenLists(1);
+		glNewList(StarsList, GL_COMPILE);
+		glShadeModel(GL_SMOOTH);
+		SetMaterial(1., 1., 1., 50.);
+		glEnable(GL_TEXTURE_2D);
+		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+		glBindTexture(GL_TEXTURE_2D, starstex);
+		OsuSphere(1000, 64., 64.);
+	glEndList();
+
+	// earth display list
+	EarthList = glGenLists(1);
+		glNewList(EarthList, GL_COMPILE);
+		glShadeModel(GL_SMOOTH);
+		SetMaterial(1., 1., 1., 50.);
+		glEnable(GL_TEXTURE_2D);
+		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+		glBindTexture(GL_TEXTURE_2D, earthtex);
+		OsuSphere(EARTH_RADIUS_MILES, 64., 64.);
+	glEndList();
+
+	// moon display list
+	MoonList = glGenLists(1);
+		glNewList(MoonList, GL_COMPILE);
+		glShadeModel(GL_SMOOTH);
+		SetMaterial(1., 1., 1., 50.);
+		glEnable(GL_TEXTURE_2D);
+		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+		glBindTexture(GL_TEXTURE_2D, moontex);
+		OsuSphere(MOON_RADIUS_MILES, 64., 64.);
+	glEndList();
 
 	// create the axes:
-
 	AxesList = glGenLists(1);
 	glNewList(AxesList, GL_COMPILE);
 	glLineWidth(AXES_WIDTH);
@@ -1095,9 +1114,7 @@ InitLists()
 	glEndList();
 }
 
-
 // the keyboard callback:
-
 void
 Keyboard(unsigned char c, int x, int y)
 {
@@ -1105,52 +1122,44 @@ Keyboard(unsigned char c, int x, int y)
 
 	switch (c)
 	{
-	case 'i':
-	case 'I':
-		WhichPOV = INSIDE;
-		break;
 
+	// set view: Outside (top), sideways, earthview, moonview
 	case 'o':
 	case 'O':
-		WhichPOV = OUTSIDE;
 		Reset();
+		WhichPOV = OUTSIDE;
 		break;
-
 	case 's':
 	case 'S':
-		WhichPOV = SIDEWAYS;
 		Reset();
+		WhichPOV = SIDEWAYS;
 		break;
-
 	case 'r':
 	case 'R':
 		Reset();
 		break;
-
 	case 'e':
 	case 'E':
 		WhichPOV = EARTHVIEW;
 		break;
-
 	case 'm':
 	case 'M':
 		WhichPOV = MOONVIEW;
 		break;
 
+	// turn orbit lines on or off
 	case 'c':
 	case 'C':
-		ORBIT_LINES_ON = 1;
+		ORBIT_LINES_ON = !ORBIT_LINES_ON;
 		break;
 
-	case 'v':
-	case 'V':
-		ORBIT_LINES_ON = 0;
-		break;
-
-	case '0':	// entering '0' will turn on/off the first/white light 
+	// turn sun's light on or off
+	case '0':	// entering '0' or '6' will turn on/off the first/white light 
 	case '6':
 		Light0On = !Light0On;
 		break;
+
+	// freeze or resume animation
 	case 'f':	// entering 'f' or 'F' will turn on/off all animation
 	case 'F':
 		Frozen = !Frozen;
@@ -1175,7 +1184,6 @@ Keyboard(unsigned char c, int x, int y)
 
 
 // called when the mouse button transitions down or up:
-
 void
 MouseButton(int button, int state, int x, int y)
 {
@@ -1186,7 +1194,6 @@ MouseButton(int button, int state, int x, int y)
 
 
 	// get the proper button bit mask:
-
 	switch (button)
 	{
 	case GLUT_LEFT_BUTTON:
@@ -1237,7 +1244,6 @@ MouseButton(int button, int state, int x, int y)
 
 
 // called when the mouse moves while a button is down:
-
 void
 MouseMotion(int x, int y)
 {
@@ -1271,7 +1277,6 @@ MouseMotion(int x, int y)
 // reset the transformations and the colors:
 // this only sets the global variables --
 // the glut main loop is responsible for redrawing the scene
-
 void
 Reset()
 {
@@ -1290,7 +1295,6 @@ Reset()
 
 
 // called when user resizes the window:
-
 void
 Resize(int width, int height)
 {
@@ -1376,7 +1380,7 @@ void
 SetPointLight(int ilight, float x, float y, float z, float r, float g, float b)
 {
 	glLightfv(ilight, GL_POSITION, Array3(x, y, z));
-	glLightfv(ilight, GL_AMBIENT, Array3(0.1, 0.1, 0.1));
+	glLightfv(ilight, GL_AMBIENT, Array3(0.1, 0.1, 0.2));
 	//glLightfv(ilight, GL_AMBIENT, Array3(1, 1, 1));
 	glLightfv(ilight, GL_DIFFUSE, Array3(r, g, b));
 	glLightfv(ilight, GL_SPECULAR, Array3(r, g, b));
