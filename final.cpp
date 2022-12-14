@@ -25,6 +25,8 @@
 #include "glut.h"
 #include "osusphere.cpp"
 
+//test comment
+
 //	This is a sample OpenGL / GLUT program
 //
 //	The objective is to draw a 3d object and change the color of the axes
